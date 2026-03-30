@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>مطبخ فرغلي - لوحة الطلبات</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@700;900&display=swap" rel="stylesheet">
+    <style>
+        :root { --pending: #ff3e3e; --preparing: #f39c12; --done: #27ae60; --dark: #121212; }
+        body { font-family: 'Cairo', sans-serif; background: var(--dark); color: white; margin: 0; padding: 20px; overflow-x: hidden; }
+        
+        h1 { text-align: center; color: var(--preparing); font-size: 35px; text-transform: uppercase; margin-bottom: 30px; border-bottom: 2px solid #333; padding-bottom: 10px; }
+
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px; }
+        
+        /* كارت الأوردر المطور */
+        .order-card {
+            background: #1e1e1e;
+            border-radius: 20px;
+            padding: 20px;
+            position: relative;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            border: 2px solid #333;
+            animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            transition: 0.3s;
+        }
+        @keyframes popIn { from {opacity:0; transform: scale(0.5)} to {opacity:1; transform: scale(1)} }
+
+        .order-status-tag { position: absolute; top: 15px; left: 15px; padding: 5px 15px; border-radius: 10px; font-size: 12px; font-weight: bold; }
+        .tag-pending { background: var(--pending); color: white; }
+        .tag-preparing { background: var(--preparing); color: white; }
+
+        .order-item { font-size: 24px; font-weight: 900; color: #fff; margin: 15px 0; display: block; border-right: 5px solid var(--preparing); padding-right: 10px; }
+        
+        .car-info { background: #2a2a2a; padding: 10px; border-radius: 12px; font-size: 14px; color: #bbb; line-height: 1.6; }
+        .car-info b { color: #fff; }
+
+        .actions { display: flex; gap: 10px; margin-top: 20px; }
+        .btn { flex: 1; padding: 15px; border: none; border-radius: 12px; font-weight: bold; cursor: pointer; font-family: 'Cairo'; font-size: 16px; transition: 0.3s; }
+        
+        .btn-prep { background: var(--preparing); color: white; }
+        .btn-done { background: var(--done); color: white; }
+        .btn:active { transform: scale(0.9); }
+
+        /* صوت التنبيه */
+        #newOrderSound { display: none; }
+    </style>
+</head>
+<body>
+
+    <h1>👨‍🍳 مطبخ فرغلي - أوردرات اللايف</h1>
+
+    <div class="grid" id="ordersGrid">
+        <!-- الأوردرات هتظهر هنا -->
+    </div>
+
+    <!-- صوت تنبيه عند وصول أوردر جديد -->
+    <audio id="orderAudio">
+        <source src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" type="audio/mpeg">
+    </audio>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getFirestore, collection, onSnapshot, doc, updateDoc, query, orderBy } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyDArRMLPNgFZOcaCYNOtL1YWTIBVtzN638",
+        projectId: "farghaly-4e65b",
+        appId: "1:549106402224:web:3a963a0478e78ce56dcc75"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    let firstLoad = true;
+
+    // 1. الاستماع للطلبات (المعلقة والتحضير فقط)
+    onSnapshot(collection(db, "orders"), (snapshot) => {
+        const grid = document.getElementById('ordersGrid');
+        
+        // تشغيل صوت لو فيه أوردر جديد زاد عن المرة اللي فاتت
+        if (!firstLoad && snapshot.docChanges().some(change => change.type === "added")) {
+            document.getElementById('orderAudio').play();
+        }
+        firstLoad = false;
+
+        // فلترة وعرض الطلبات (التي لم تنتهِ بعد)
+        const activeOrders = [];
+        snapshot.forEach(d => {
+            const data = d.data();
+            if(data.status !== 'completed') {
+                activeOrders.push({id: d.id, ...data});
+            }
+        });
+
+        // ترتيب حسب الوقت (الأقدم فوق)
+        activeOrders.sort((a, b) => b.timestamp - a.timestamp);
+
+        grid.innerHTML = activeOrders.map(o => `
+            <div class="order-card" style="border-color: ${o.status === 'preparing' ? 'var(--preparing)' : '#333'}">
+                <div class="order-status-tag ${o.status === 'preparing' ? 'tag-preparing' : 'tag-pending'}">
+                    ${o.status === 'preparing' ? 'جاري التحضير' : 'في الانتظار'}
+                </div>
+                
+                <span class="order-item">${o.item}</span>
+                
+                <div class="car-info">
+                    🚗 السيارة: <b>${o.car} (${o.color})</b><br>
+                    🔢 النمرة: <b>${o.plate || 'غير مسجلة'}</b><br>
+                    📞 الموبايل: <b>${o.phone}</b>
+                </div>
+
+                <div class="actions">
+                    ${o.status === 'pending' ? 
+                        `<button class="btn btn-prep" onclick="updateStatus('${o.id}', 'preparing')">بدء التحضير 🍎</button>` : 
+                        `<button class="btn btn-done" onclick="updateStatus('${o.id}', 'completed')">تم التوصيل ✅</button>`
+                    }
+                </div>
+            </div>
+        `).join('');
+
+        if(activeOrders.length === 0) {
+            grid.innerHTML = "<h2 style='grid-column: 1/-1; text-align:center; color:#444'>لا توجد طلبات حالياً..</h2>";
+        }
+    });
+
+    // 2. تحديث الحالة (انتظار -> تحضير -> تم)
+    window.updateStatus = async (id, newStatus) => {
+        try {
+            const orderRef = doc(db, "orders", id);
+            await updateDoc(orderRef, { status: newStatus });
+        } catch (e) {
+            alert("خطأ في التحديث: " + e.message);
+        }
+    };
+
+</script>
+</body>
+</html>
