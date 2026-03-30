@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>فرغلي - تتبع طلبك</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #FF8C00;
+            --secondary: #4CAF50;
+            --bg: #F0F2F5;
+            --card-shadow: 0 20px 40px rgba(0,0,0,0.1);
+        }
+
+        body {
+            font-family: 'Cairo', sans-serif;
+            background: var(--bg);
+            margin: 0;
+            padding-bottom: 120px;
+            color: #333;
+        }
+
+        /* هيدر 3D */
+        header {
+            background: white;
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+        }
+
+        .logo { font-weight: 900; font-size: 22px; color: var(--primary); }
+        .profile-btn { background: var(--bg); padding: 8px 15px; border-radius: 12px; font-size: 12px; font-weight: 700; cursor: pointer; }
+
+        /* كارت تتبع الحالة 3D */
+        #orderStatusCard {
+            display: none; /* مخفي لو مفيش أوردر */
+            background: white;
+            margin: 15px;
+            padding: 20px;
+            border-radius: 25px;
+            box-shadow: var(--card-shadow);
+            border-top: 5px solid var(--primary);
+            animation: slideDown 0.5s ease-out;
+        }
+
+        @keyframes slideDown { from { transform: translateY(-20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+        .status-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .status-title { font-weight: 900; font-size: 18px; color: var(--primary); }
+        .status-badge { background: #fff3e0; color: var(--primary); padding: 5px 12px; border-radius: 10px; font-size: 12px; font-weight: bold; border: 1px solid var(--primary); }
+
+        /* شريط التقدم 3D */
+        .progress-track {
+            display: flex;
+            justify-content: space-between;
+            position: relative;
+            margin: 20px 0;
+        }
+        .line { position: absolute; top: 15px; left: 0; right: 0; height: 4px; background: #eee; z-index: 1; }
+        .line-active { position: absolute; top: 15px; left: 0; width: 0%; height: 4px; background: var(--secondary); z-index: 2; transition: 1s ease; }
+        
+        .step {
+            width: 35px;
+            height: 35px;
+            background: white;
+            border: 3px solid #eee;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 3;
+            font-size: 14px;
+            transition: 0.5s;
+        }
+        .step.active { border-color: var(--secondary); background: var(--secondary); color: white; transform: scale(1.1); box-shadow: 0 5px 15px rgba(76, 175, 80, 0.3); }
+
+        /* ستايل المنيو */
+        .cats { display: flex; overflow-x: auto; padding: 15px; gap: 10px; scrollbar-width: none; }
+        .cat-card { background: white; padding: 10px 20px; border-radius: 15px; font-weight: bold; white-space: nowrap; box-shadow: 0 4px 10px rgba(0,0,0,0.03); }
+        .cat-card.active { background: var(--primary); color: white; }
+
+        .items-container { padding: 0 15px; }
+        .item-3d {
+            background: white;
+            border-radius: 20px;
+            margin-bottom: 15px;
+            padding: 12px;
+            display: flex;
+            gap: 15px;
+            box-shadow: var(--card-shadow);
+        }
+        .img-box { width: 80px; height: 80px; border-radius: 15px; overflow: hidden; }
+        .img-box img { width: 100%; height: 100%; object-fit: cover; }
+        
+        .add-control { margin-right: auto; align-self: center; }
+        .btn-sq { background: var(--primary); color: white; border: none; padding: 8px 15px; border-radius: 10px; font-weight: bold; }
+
+        /* سلة عائمة */
+        .floating-cart {
+            position: fixed;
+            bottom: 25px;
+            left: 15px;
+            right: 15px;
+            background: var(--primary);
+            padding: 18px;
+            border-radius: 20px;
+            display: none;
+            justify-content: space-between;
+            align-items: center;
+            color: white;
+            font-weight: 900;
+            box-shadow: 0 10px 30px rgba(255, 140, 0, 0.3);
+            z-index: 2000;
+        }
+
+        /* المودال */
+        .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); backdrop-filter: blur(5px); z-index: 3000; align-items: center; justify-content: center; padding: 20px; }
+        .modal-body { background: white; width: 100%; max-width: 400px; padding: 25px; border-radius: 25px; }
+        input { width: 100%; padding: 15px; margin: 8px 0; border: 1.5px solid #eee; border-radius: 12px; box-sizing: border-box; font-family: 'Cairo'; }
+        .confirm-btn { background: var(--secondary); color: white; border: none; width: 100%; padding: 15px; border-radius: 15px; font-weight: 900; margin-top: 10px; }
+    </style>
+</head>
+<body>
+
+<header>
+    <div class="logo">فرغلي 🥤</div>
+    <div class="profile-btn" onclick="openProfile()">🚗 بيانات سيارتي</div>
+</header>
+
+<!-- رادار تتبع الطلب (الحالة) -->
+<div id="orderStatusCard">
+    <div class="status-header">
+        <div>
+            <div class="status-title" id="statusLabel">قيد الانتظار...</div>
+            <div id="orderSummary" style="font-size: 11px; color: #777;">جاري استلام طلبك</div>
+        </div>
+        <div class="status-badge" id="orderIdText">#000</div>
+    </div>
+
+    <div class="progress-track">
+        <div class="line"></div>
+        <div class="line-active" id="progressLine"></div>
+        <div class="step" id="step1">🕒</div>
+        <div class="step" id="step2">🍎</div>
+        <div class="step" id="step3">🛵</div>
+    </div>
+    <div style="display: flex; justify-content: space-between; font-size: 10px; color: #999; font-weight: bold; margin-top: -10px;">
+        <span>انتظار</span>
+        <span>تحضير</span>
+        <span>وصلنا!</span>
+    </div>
+</div>
+
+<div class="cats" id="catsList"></div>
+<div class="items-container" id="menuDisplay">جاري التحميل...</div>
+
+<div class="floating-cart" id="cartBar" onclick="openCheckout()">
+    <span id="cartInfo">0 صنف</span>
+    <span>تأكيد الطلب 🚀</span>
+    <span id="cartTotal">0 ج.م</span>
+</div>
+
+<div class="modal" id="formModal">
+    <div class="modal-body">
+        <h2 id="modalTitle" style="margin-top:0; color: var(--primary);">بيانات السيارة</h2>
+        <input type="text" id="carModel" placeholder="نوع السيارة">
+        <input type="text" id="carColor" placeholder="لون السيارة">
+        <input type="text" id="carPlate" placeholder="رقم اللوحة">
+        <input type="tel" id="phone" placeholder="رقم الموبايل">
+        <button class="confirm-btn" id="submitBtn">إرسال الطلب</button>
+        <button onclick="closeModal()" style="width:100%; background:none; border:none; margin-top:10px; color:gray;">رجوع</button>
+    </div>
+</div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getFirestore, collection, onSnapshot, addDoc, doc, updateDoc, arrayUnion } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyDArRMLPNgFZOcaCYNOtL1YWTIBVtzN638",
+        projectId: "farghaly-4e65b",
+        appId: "1:549106402224:web:3a963a0478e78ce56dcc75"
+    };
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    let allItems = [];
+    let cart = {};
+    let activeOrderID = localStorage.getItem('active_order_id');
+
+    // 1. جلب البيانات
+    onSnapshot(collection(db, "categories"), snap => {
+        const list = document.getElementById('catsList');
+        list.innerHTML = `<div class="cat-card active" onclick="filterMenu('الكل', this)">الكل</div>`;
+        snap.forEach(d => list.innerHTML += `<div class="cat-card" onclick="filterMenu('${d.data().name}', this)">${d.data().name}</div>`);
+    });
+
+    onSnapshot(collection(db, "menu"), snap => {
+        allItems = [];
+        snap.forEach(d => allItems.push({id: d.id, ...d.data()}));
+        renderMenu(allItems);
+    });
+
+    function renderMenu(data) {
+        document.getElementById('menuDisplay').innerHTML = data.map(item => {
+            const qty = cart[item.name]?.qty || 0;
+            return `
+                <div class="item-3d">
+                    <div class="img-box"><img src="${item.img}" onerror="this.src='https://via.placeholder.com/80'"></div>
+                    <div class="info">
+                        <div style="font-weight:900; font-size:16px;">${item.name}</div>
+                        <div style="color:var(--secondary); font-weight:bold;">${item.price} ج.م</div>
+                    </div>
+                    <div class="add-control">
+                        <button class="btn-sq" onclick="changeQty('${item.name}', 1, ${item.price})">${qty > 0 ? qty + ' +' : 'إضافة +'}</button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    // 2. تتبع الحالة (الرادار)
+    if (activeOrderID) {
+        onSnapshot(doc(db, "orders", activeOrderID), (d) => {
+            if (d.exists()) {
+                const order = d.data();
+                document.getElementById('orderStatusCard').style.display = 'block';
+                document.getElementById('orderSummary').innerText = order.item;
+                document.getElementById('orderIdText').innerText = "#" + activeOrderID.slice(-3);
+                updateTrackerUI(order.status);
+                
+                // لو الأوردر خلص، امسحه بعد دقيقتين
+                if (order.status === 'completed') {
+                    setTimeout(() => {
+                        localStorage.removeItem('active_order_id');
+                        document.getElementById('orderStatusCard').style.display = 'none';
+                    }, 120000);
+                }
+            }
+        });
+    }
+
+    function updateTrackerUI(status) {
+        const line = document.getElementById('progressLine');
+        const s1 = document.getElementById('step1');
+        const s2 = document.getElementById('step2');
+        const s3 = document.getElementById('step3');
+        const label = document.getElementById('statusLabel');
+
+        [s1, s2, s3].forEach(s => s.classList.remove('active'));
+
+        if (status === 'pending') {
+            line.style.width = '0%';
+            s1.classList.add('active');
+            label.innerText = "قيد الانتظار... 🕒";
+        } else if (status === 'preparing') {
+            line.style.width = '50%';
+            s1.classList.add('active');
+            s2.classList.add('active');
+            label.innerText = "جاري التحضير الآن 🍎";
+        } else if (status === 'completed') {
+            line.style.width = '100%';
+            s1.classList.add('active'); s2.classList.add('active'); s3.classList.add('active');
+            label.innerText = "وصلنا لعربيتك! ✅";
+        }
+    }
+
+    // 3. السلة والطلب
+    window.changeQty = (name, delta, price) => {
+        if(!cart[name]) cart[name] = {qty: 0, price: price};
+        cart[name].qty += delta;
+        if(cart[name].qty <= 0) delete cart[name];
+        
+        let total = 0, count = 0;
+        Object.keys(cart).forEach(k => { total += (cart[k].qty * cart[k].price); count += cart[k].qty; });
+        document.getElementById('cartBar').style.display = count > 0 ? 'flex' : 'none';
+        document.getElementById('cartInfo').innerText = count + " صنف";
+        document.getElementById('cartTotal').innerText = total + " ج.م";
+        renderMenu(allItems);
+    };
+
+    window.openProfile = () => {
+        const saved = JSON.parse(localStorage.getItem('farghaly_profile') || '{}');
+        document.getElementById('carModel').value = saved.car || '';
+        document.getElementById('carColor').value = saved.color || '';
+        document.getElementById('carPlate').value = saved.plate || '';
+        document.getElementById('phone').value = saved.phone || '';
+        document.getElementById('submitBtn').innerText = "حفظ البيانات";
+        document.getElementById('submitBtn').onclick = () => {
+            const p = { car: document.getElementById('carModel').value, color: document.getElementById('carColor').value, plate: document.getElementById('carPlate').value, phone: document.getElementById('phone').value };
+            localStorage.setItem('farghaly_profile', JSON.stringify(p));
+            alert("تم الحفظ ✅"); closeModal();
+        };
+        document.getElementById('formModal').style.display = 'flex';
+    };
+
+    window.openCheckout = () => {
+        const saved = JSON.parse(localStorage.getItem('farghaly_profile') || '{}');
+        document.getElementById('carModel').value = saved.car || '';
+        document.getElementById('carColor').value = saved.color || '';
+        document.getElementById('carPlate').value = saved.plate || '';
+        document.getElementById('phone').value = saved.phone || '';
+        
+        document.getElementById('submitBtn').innerText = activeOrderID ? "تزويد على طلبي +" : "تأكيد الأوردر 🚀";
+        document.getElementById('submitBtn').onclick = activeOrderID ? updateOrder : sendOrder;
+        document.getElementById('formModal').style.display = 'flex';
+    };
+
+    async function sendOrder() {
+        const profile = { car: document.getElementById('carModel').value, color: document.getElementById('carColor').value, plate: document.getElementById('carPlate').value, phone: document.getElementById('phone').value };
+        if(!profile.car || !profile.phone) return alert("كمل بياناتك!");
+        localStorage.setItem('farghaly_profile', JSON.stringify(profile));
+
+        const orderText = Object.keys(cart).map(k => `${k} (x${cart[k].qty})`).join(' + ');
+        const docRef = await addDoc(collection(db, "orders"), { ...profile, item: orderText, status: "pending", timestamp: Date.now() });
+        localStorage.setItem('active_order_id', docRef.id);
+        alert("الأوردر وصل المطبخ! 🥤");
+        location.reload();
+    }
+
+    async function updateOrder() {
+        const orderRef = doc(db, "orders", activeOrderID);
+        const moreItems = Object.keys(cart).map(k => `${k} (x${cart[k].qty})`).join(' + ');
+        await updateDoc(orderRef, { item: arrayUnion(" [زاد: " + moreItems + "]") });
+        alert("تم الإضافة لطلبك الحالي! ✅");
+        location.reload();
+    }
+
+    window.closeModal = () => document.getElementById('formModal').style.display = 'none';
+</script>
+</body>
+</html>
