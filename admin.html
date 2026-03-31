@@ -7,8 +7,25 @@
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;800&display=swap" rel="stylesheet">
     <style>
         :root { --primary: #d32f2f; --secondary: #2c3e50; --success: #27ae60; --bg: #f0f2f5; }
-        body { font-family: 'Cairo', sans-serif; background: var(--bg); margin: 0; padding: 0; direction: rtl; }
+        body { font-family: 'Cairo', sans-serif; background: var(--bg); margin: 0; padding: 0; direction: rtl; transition: padding-top 0.4s; }
         
+        /* شريط التنبيه الخاص بالاشتراك */
+        #sub-bar {
+            position: fixed; top: 0; left: 0; right: 0; height: 50px;
+            display: none; align-items: center; justify-content: center;
+            z-index: 1000; font-weight: 800; font-size: 14px;
+            background: #c0392b; color: white; animation: blink 1s infinite;
+            border-bottom: 2px solid #7b241c; box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+        }
+        @keyframes blink { 0% {opacity: 1} 50% {opacity: 0.8} 100% {opacity: 1} }
+
+        /* شاشة القفل النهائي للسيستم */
+        #lock-screen {
+            position: fixed; inset: 0; background: #fff; z-index: 10000;
+            display: none; flex-direction: column; align-items: center; justify-content: center;
+            text-align: center; padding: 20px;
+        }
+
         /* شاشة الدخول */
         #login-section { height: 100vh; display: flex; align-items: center; justify-content: center; }
         .login-card { background: white; padding: 30px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 90%; max-width: 380px; text-align: center; }
@@ -38,11 +55,20 @@
         table th { background: #f8f9fa; color: #666; font-size: 13px; padding: 12px; }
         table td { padding: 12px; border-bottom: 1px solid #eee; text-align: center; font-size: 14px; }
         .img-table { width: 45px; height: 45px; border-radius: 8px; object-fit: cover; }
-
-        .filter-bar { display: flex; gap: 10px; background: #fff; padding: 15px; border-radius: 10px; margin-bottom: 15px; align-items: flex-end; }
     </style>
 </head>
 <body>
+
+    <!-- شريط تنبيه فترة السماح -->
+    <div id="sub-bar">تنبيه: سيتم إيقاف السيستم قريباً.. يرجى التجديد</div>
+
+    <!-- شاشة قفل السيستم النهائي -->
+    <div id="lock-screen">
+        <h1 style="font-size: 60px; margin: 0;">🛑</h1>
+        <h2 style="color: var(--primary);">توقف السيستم - انتهى الاشتراك</h2>
+        <p>يرجى التواصل مع الإدارة لتفعيل السيستم ومتابعة العمل.</p>
+        <div id="pay-info" style="background: #f8f9fa; padding: 20px; border-radius: 15px; border: 1px solid #ddd; margin-top: 20px;"></div>
+    </div>
 
     <!-- شاشة الدخول -->
     <div id="login-section">
@@ -58,7 +84,7 @@
     <div id="admin-panel" style="display: none;">
         <div class="navbar">
             <span style="font-weight: 800;">إدارة فرغلي 🍹</span>
-            <button onclick="logout()" style="background:none; color:white; border:1px solid white; padding:4px 12px;">خروج</button>
+            <button onclick="logout()" style="background:none; color:white; border:1px solid white; padding:4px 12px; font-size: 11px;">خروج</button>
         </div>
 
         <div class="tabs">
@@ -68,27 +94,19 @@
         </div>
 
         <div class="container">
-            
             <!-- صفحة التقارير -->
             <div id="reports" class="page active">
                 <div class="card" style="background: var(--secondary); color: white;">
-                    <h3 style="margin:0 0 10px 0; font-size: 16px;">🛒 تسجيل أوردر سريع</h3>
+                    <h3 style="margin:0 0 10px 0; font-size: 15px;">🛒 تسجيل أوردر سريع</h3>
                     <div style="display: flex; gap: 10px;">
                         <select id="sellProductSelect" style="margin:0;"><option value="">اختر من المنيو...</option></select>
                         <button onclick="recordSale()" style="background: var(--success); color: white; width: 100px;">بيع ✅</button>
                     </div>
                 </div>
 
-                <div class="filter-bar">
-                    <div style="flex:1;"><label style="font-size: 12px;">من:</label><input type="date" id="dateFrom"></div>
-                    <div style="flex:1;"><label style="font-size: 12px;">إلى:</label><input type="date" id="dateTo"></div>
-                    <button onclick="filterSales()" style="background: var(--primary); color: white; height: 45px; padding: 0 20px;">تطبيق الفلتر</button>
-                </div>
-
                 <div class="stats-grid">
                     <div class="stat-box"><h3>إجمالي الدخل</h3><p id="statIncome">0</p></div>
                     <div class="stat-box"><h3>عدد المبيعات</h3><p id="statOrders">0</p></div>
-                    <div class="stat-box" style="flex: 2;"><h3>الصنف الأكثر طلباً</h3><p id="statTopProduct">-</p></div>
                 </div>
 
                 <div class="card" style="padding:0;">
@@ -102,7 +120,6 @@
             <!-- صفحة إدارة المنيو -->
             <div id="menu" class="page">
                 <div class="card" style="padding:0;">
-                    <h3 style="padding: 15px; margin: 0;">أصناف المنيو الحالية</h3>
                     <table>
                         <thead><tr><th>صورة</th><th>الاسم</th><th>السعر</th><th>تحكم</th></tr></thead>
                         <tbody id="menuTableBody"></tbody>
@@ -110,9 +127,8 @@
                 </div>
             </div>
 
-            <!-- صفحة الإعدادات (إضافة وحذف) -->
+            <!-- صفحة الإعدادات -->
             <div id="add" class="page">
-                <!-- إضافة منتج -->
                 <div class="card">
                     <h3>🍎 إضافة منتج جديد</h3>
                     <input type="text" id="pName" placeholder="اسم العصير">
@@ -121,43 +137,62 @@
                     <input type="text" id="pImgUrl" placeholder="رابط الصورة">
                     <button class="btn-main" onclick="addProduct()">حفظ في المنيو</button>
                 </div>
-
-                <!-- إدارة الأقسام -->
+                
                 <div class="card">
                     <h3>📁 إدارة الأقسام</h3>
-                    <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-                        <input type="text" id="catName" placeholder="اسم القسم الجديد" style="margin:0;">
-                        <button onclick="addCategory()" style="background: var(--secondary); color: white; width: 120px;">إضافة</button>
-                    </div>
-                    
-                    <h4 style="margin: 20px 0 10px 0; color: #666;">الأقسام المضافة حالياً:</h4>
-                    <table>
-                        <thead><tr><th>اسم القسم</th><th>حذف</th></tr></thead>
+                    <input type="text" id="catName" placeholder="اسم القسم الجديد">
+                    <button class="btn-main" onclick="addCategory()" style="background: var(--secondary);">إضافة قسم</button>
+                    <table style="margin-top: 15px;">
                         <tbody id="catTableBody"></tbody>
                     </table>
                 </div>
             </div>
-
         </div>
     </div>
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
     import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+    import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
     const firebaseConfig = {
         apiKey: "AIzaSyDArRMLPNgFZOcaCYNOtL1YWTIBVtzN638",
-        authDomain: "farghaly-4e65b.firebaseapp.com",
         projectId: "farghaly-4e65b",
-        storageBucket: "farghaly-4e65b.firebasestorage.app",
-        messagingSenderId: "549106402224",
+        databaseURL: "https://farghaly-4e65b-default-rtdb.firebaseio.com",
         appId: "1:549106402224:web:3a963a0478e78ce56dcc75"
     };
 
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
+    const rtdb = getDatabase(app);
 
-    // --- التبديل بين الصفحات ---
+    // --- نظام حماية السيستم (الاشتراك) ---
+    onValue(ref(rtdb, 'config'), snap => {
+        const config = snap.val() || {};
+        const now = Date.now();
+        const expiry = config.expiryDate || 0;
+        const grace = (config.graceDays || 0) * 24 * 60 * 60 * 1000;
+        const deadline = expiry + grace;
+
+        const bar = document.getElementById('sub-bar');
+        const lock = document.getElementById('lock-screen');
+
+        if (config.manualLocked || now > deadline) {
+            lock.style.display = 'flex';
+            bar.style.display = 'none';
+            document.getElementById('pay-info').innerHTML = `للتواصل: ${config.payPhone || ''}<br>الحساب: ${config.accNumber || ''}`;
+        } else if (now > expiry) {
+            bar.style.display = 'flex';
+            document.body.style.paddingTop = '50px';
+            const h = Math.round((deadline - now) / 3600000);
+            bar.innerText = `⚠️ تنبيه: سيغلق السيستم قريباً (متبقي ${h} ساعة سماح)`;
+        } else {
+            bar.style.display = 'none';
+            document.body.style.paddingTop = '0';
+        }
+    });
+
+    // --- إدارة الصفحات والدخول ---
     window.openPage = (pageId, btn) => {
         document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -165,12 +200,10 @@
         btn.classList.add('active');
     };
 
-    // --- الدخول ---
     document.getElementById('loginBtn').onclick = () => {
         if(document.getElementById('userEmail').value === "admin@farghaly.com" && document.getElementById('userPass').value === "123") {
-            localStorage.setItem('f_admin', 'ok');
-            location.reload();
-        } else { alert("بيانات خطأ!"); }
+            localStorage.setItem('f_admin', 'ok'); location.reload();
+        } else { alert("خطأ!"); }
     };
     if(localStorage.getItem('f_admin') === 'ok') {
         document.getElementById('login-section').style.display = 'none';
@@ -178,118 +211,67 @@
     }
     window.logout = () => { localStorage.removeItem('f_admin'); location.reload(); };
 
-    // --- تحديث الأقسام (قائمة منسدلة + جدول الإدارة) ---
+    // --- وظائف السيستم (منيو / مبيعات) ---
     onSnapshot(collection(db, "categories"), (snap) => {
         const select = document.getElementById('pCat');
         const catTable = document.getElementById('catTableBody');
         select.innerHTML = '<option value="">اختر القسم</option>';
         catTable.innerHTML = '';
-        
         snap.forEach(d => {
-            const cat = d.data();
-            select.innerHTML += `<option value="${cat.name}">${cat.name}</option>`;
-            catTable.innerHTML += `
-                <tr>
-                    <td style="text-align:right; font-weight:bold;">${cat.name}</td>
-                    <td><button class="btn-del" onclick="deleteItem('categories', '${d.id}')">حذف</button></td>
-                </tr>
-            `;
+            select.innerHTML += `<option value="${d.data().name}">${d.data().name}</option>`;
+            catTable.innerHTML += `<tr><td style="text-align:right;">${d.data().name}</td><td><button class="btn-del" onclick="deleteItem('categories', '${d.id}')">حذف</button></td></tr>`;
         });
     });
 
-    // --- تحديث المنيو ---
     onSnapshot(collection(db, "menu"), (snap) => {
         const menuTable = document.getElementById('menuTableBody');
         const sellSelect = document.getElementById('sellProductSelect');
         menuTable.innerHTML = '';
         sellSelect.innerHTML = '<option value="">اختر من المنيو...</option>';
-        
         snap.forEach(d => {
             const item = d.data();
-            menuTable.innerHTML += `
-                <tr>
-                    <td><img src="${item.img}" class="img-table"></td>
-                    <td>${item.name}</td>
-                    <td>${item.price} ج.م</td>
-                    <td><button class="btn-del" onclick="deleteItem('menu', '${d.id}')">حذف</button></td>
-                </tr>
-            `;
-            sellSelect.innerHTML += `<option value="${d.id}" data-name="${item.name}" data-price="${item.price}">${item.name} (${item.price} ج.م)</option>`;
+            menuTable.innerHTML += `<tr><td><img src="${item.img}" class="img-table"></td><td>${item.name}</td><td>${item.price}ج</td><td><button class="btn-del" onclick="deleteItem('menu', '${d.id}')">حذف</button></td></tr>`;
+            sellSelect.innerHTML += `<option value="${d.id}" data-name="${item.name}" data-price="${item.price}">${item.name}</option>`;
         });
     });
 
-    // --- المبيعات والتقارير ---
     window.recordSale = async () => {
         const sel = document.getElementById('sellProductSelect');
         const opt = sel.options[sel.selectedIndex];
-        if(!sel.value) return alert("اختر منتج أولاً");
-
-        await addDoc(collection(db, "sales"), {
-            name: opt.getAttribute('data-name'),
-            price: parseFloat(opt.getAttribute('data-price')),
-            time: Date.now(),
-            date: new Date().toISOString().split('T')[0]
-        });
-        alert("تم تسجيل الأوردر ✅");
-        filterSales();
+        if(!sel.value) return;
+        await addDoc(collection(db, "sales"), { name: opt.getAttribute('data-name'), price: parseFloat(opt.getAttribute('data-price')), time: Date.now(), date: new Date().toISOString().split('T')[0] });
+        alert("تم البيع ✅");
     };
 
-    window.filterSales = async () => {
-        const from = document.getElementById('dateFrom').value;
-        const to = document.getElementById('dateTo').value;
-        const snap = await getDocs(query(collection(db, "sales"), orderBy("time", "desc")));
-        
-        let income = 0, count = 0, products = {};
+    onSnapshot(query(collection(db, "sales"), orderBy("time", "desc")), snap => {
+        let income = 0, count = 0;
         const table = document.getElementById('salesTableBody');
         table.innerHTML = '';
-
         snap.forEach(d => {
             const s = d.data();
-            if((!from || s.date >= from) && (!to || s.date <= to)) {
-                income += s.price;
-                count++;
-                products[s.name] = (products[s.name] || 0) + 1;
-                const timeStr = new Date(s.time).toLocaleTimeString('ar-EG', {hour:'2-digit', minute:'2-digit'});
-                table.innerHTML += `<tr><td>${timeStr}</td><td>${s.name}</td><td>${s.price} ج.م</td></tr>`;
-            }
+            income += s.price; count++;
+            const timeStr = new Date(s.time).toLocaleTimeString('ar-EG', {hour:'2-digit', minute:'2-digit'});
+            table.innerHTML += `<tr><td>${timeStr}</td><td>${s.name}</td><td>${s.price} ج</td></tr>`;
         });
-
         document.getElementById('statIncome').innerText = income + " ج.م";
         document.getElementById('statOrders').innerText = count;
-        const top = Object.keys(products).reduce((a, b) => products[a] > products[b] ? a : b, "-");
-        document.getElementById('statTopProduct').innerText = top;
-    };
+    });
 
-    // --- الوظائف العامة (إضافة وحذف) ---
     window.addCategory = async () => {
-        const name = document.getElementById('catName').value.trim();
-        if(!name) return alert("اكتب اسم القسم");
-        await addDoc(collection(db, "categories"), { name });
+        const name = document.getElementById('catName').value;
+        if(name) await addDoc(collection(db, "categories"), { name });
         document.getElementById('catName').value = '';
     };
 
     window.addProduct = async () => {
-        const name = document.getElementById('pName').value;
-        const price = document.getElementById('pPrice').value;
-        const cat = document.getElementById('pCat').value;
-        const img = document.getElementById('pImgUrl').value;
-        if(name && price && cat && img) {
+        const name = document.getElementById('pName').value, price = document.getElementById('pPrice').value, cat = document.getElementById('pCat').value, img = document.getElementById('pImgUrl').value;
+        if(name && price && cat) {
             await addDoc(collection(db, "menu"), { name, price: parseFloat(price), category: cat, img });
-            alert("تم حفظ المنتج");
-            document.getElementById('pName').value = '';
-            document.getElementById('pPrice').value = '';
-            document.getElementById('pImgUrl').value = '';
-        } else { alert("كمل البيانات!"); }
-    };
-
-    window.deleteItem = async (coll, id) => {
-        if(confirm("هل أنت متأكد من الحذف؟")) {
-            await deleteDoc(doc(db, coll, id));
+            alert("تم الإضافة");
         }
     };
 
-    // تشغيل التقرير عند الفتح
-    setTimeout(filterSales, 1000);
+    window.deleteItem = async (coll, id) => { if(confirm("حذف؟")) await deleteDoc(doc(db, coll, id)); };
 
 </script>
 </body>
