@@ -15,6 +15,16 @@
 
         body { font-family: 'Cairo', sans-serif; background: var(--bg); margin: 0; padding-bottom: 120px; color: #333; }
 
+        /* شاشة انتهاء الاشتراك */
+        #expiry-screen {
+            position: fixed; inset: 0; background: #fff; z-index: 100000;
+            display: none; flex-direction: column; align-items: center; justify-content: center;
+            padding: 30px; text-align: center;
+        }
+        .expiry-box { background: #fff9f0; padding: 25px; border-radius: 20px; border: 2px dashed var(--primary); }
+        .expiry-icon { font-size: 60px; margin-bottom: 15px; }
+        .pay-info { background: #fff; padding: 15px; border-radius: 12px; margin-top: 20px; text-align: right; width: 100%; box-shadow: 0 5px 15px rgba(0,0,0,0.05); }
+
         /* ستايل شاشة التحميل */
         #loader-screen {
             position: fixed; inset: 0; background: #ffffff; z-index: 99999;
@@ -30,7 +40,6 @@
         .progress-fill-loader { width: 0%; height: 100%; background: var(--primary); animation: fillProgress 2s forwards; }
         @keyframes fillProgress { to { width: 100%; } }
         
-        /* الكود اللي كان ناقص عندك */
         .loader-hidden { opacity: 0 !important; visibility: hidden !important; }
 
         /* التصميم العام */
@@ -72,11 +81,26 @@
 </head>
 <body>
 
+    <!-- شاشة انتهاء الاشتراك -->
+    <div id="expiry-screen">
+        <div class="expiry-box">
+            <div class="expiry-icon">⚠️</div>
+            <h2 style="color:var(--primary)">عذراً.. الخدمة متوقفة مؤقتاً</h2>
+            <p>انتهت فترة صلاحية التطبيق أو تم إيقافه من قبل الإدارة. يرجى التواصل لتجديد الاشتراك.</p>
+            
+            <div class="pay-info" id="payment-details">
+                <!-- ستظهر هنا بيانات التواصل -->
+                جاري تحميل بيانات التواصل...
+            </div>
+            
+            <button onclick="location.reload()" class="confirm-btn" style="background: var(--primary);">تحديث الصفحة</button>
+        </div>
+    </div>
+
     <!-- شاشة التحميل -->
     <div id="loader-screen">
         <div class="loader-content">
             <div class="logo-wrapper">
-                <!-- لو مش معاك لوجو استخدم الرابط ده مؤقتاً -->
                 <img src="9991132b-0ef0-4c49-841b-1f1ed017ac6c.jpg" onerror="this.src='https://cdn-icons-png.flaticon.com/512/3069/3069324.png'" class="loader-logo">
             </div>
             <h2 class="loader-text">فرغلي.. أصل العصير 🥤</h2>
@@ -132,21 +156,56 @@
         </div>
     </div>
 
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getFirestore, collection, onSnapshot, addDoc, doc, updateDoc, arrayUnion } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
 
+    <script>
         const firebaseConfig = {
             apiKey: "AIzaSyDArRMLPNgFZOcaCYNOtL1YWTIBVtzN638",
             projectId: "farghaly-4e65b",
+            databaseURL: "https://farghaly-4e65b-default-rtdb.firebaseio.com",
             appId: "1:549106402224:web:3a963a0478e78ce56dcc75"
         };
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
+        
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+        const rtdb = firebase.database();
 
         let allItems = [];
         let cart = {};
         let activeOrderID = localStorage.getItem('active_order_id');
+
+        // --- نظام حماية الاشتراك ---
+        rtdb.ref('config').on('value', snap => {
+            const config = snap.val();
+            if (config) {
+                const now = Date.now();
+                const expiryDate = config.expiryDate || 0;
+                const gracePeriod = (config.graceDays || 0) * 24 * 60 * 60 * 1000;
+                const totalAllowedTime = expiryDate + gracePeriod;
+
+                if (config.manualLocked || now > totalAllowedTime) {
+                    showExpiryScreen(config);
+                } else {
+                    document.getElementById('expiry-screen').style.display = 'none';
+                }
+            }
+        });
+
+        function showExpiryScreen(config) {
+            const screen = document.getElementById('expiry-screen');
+            const details = document.getElementById('payment-details');
+            screen.style.display = 'flex';
+            details.innerHTML = `
+                <b>للتجديد يرجى التواصل معنا:</b><br>
+                📞 هاتف: ${config.payPhone || 'غير متوفر'}<br>
+                💳 الحساب: ${config.accNumber || 'غير متوفر'}<br>
+                👤 الاسم: ${config.accName || 'غير متوفر'}
+            `;
+        }
+        // -------------------------
 
         // إخفاء الشاشة بعد التحميل
         window.addEventListener('load', () => {
@@ -155,8 +214,8 @@
             }, 2000);
         });
 
-        // جلب البيانات
-        onSnapshot(collection(db, "categories"), snap => {
+        // جلب المنيو والتصنيفات
+        db.collection("categories").onSnapshot(snap => {
             const list = document.getElementById('catsList');
             list.innerHTML = `<div class="cat-card active" onclick="window.filterMenu('الكل', this)">الكل</div>`;
             snap.forEach(d => {
@@ -164,7 +223,7 @@
             });
         });
 
-        onSnapshot(collection(db, "menu"), snap => {
+        db.collection("menu").onSnapshot(snap => {
             allItems = [];
             snap.forEach(d => allItems.push({id: d.id, ...d.data()}));
             renderMenu(allItems);
@@ -188,17 +247,13 @@
             }).join('');
         }
 
-        // تتبع الحالة
         if (activeOrderID) {
-            onSnapshot(doc(db, "orders", activeOrderID), (d) => {
-                if (d.exists()) {
+            db.collection("orders").doc(activeOrderID).onSnapshot((d) => {
+                if (d.exists) {
                     const order = d.data();
                     document.getElementById('orderStatusCard').style.display = 'block';
-                    document.getElementById('orderSummary').innerText = order.item;
+                    document.getElementById('orderSummary').innerText = Array.isArray(order.item) ? order.item.join('') : order.item;
                     updateTrackerUI(order.status);
-                    if (order.status === 'completed') {
-                        setTimeout(() => { localStorage.removeItem('active_order_id'); document.getElementById('orderStatusCard').style.display='none'; }, 60000);
-                    }
                 }
             });
         }
@@ -263,7 +318,7 @@
             const p = { car: document.getElementById('carModel').value, color: document.getElementById('carColor').value, plate: document.getElementById('carPlate').value, phone: document.getElementById('phone').value };
             if(!p.car || !p.phone) return alert("كمل بياناتك!");
             const orderText = Object.keys(cart).map(k => `${k} (x${cart[k].qty})`).join(' + ');
-            const docRef = await addDoc(collection(db, "orders"), { ...p, item: orderText, status: "pending", timestamp: Date.now() });
+            const docRef = await db.collection("orders").add({ ...p, item: orderText, status: "pending", timestamp: Date.now() });
             localStorage.setItem('active_order_id', docRef.id);
             alert("طلبك وصل المطبخ! 🥤");
             location.reload();
@@ -271,7 +326,9 @@
 
         async function updateOrder() {
             const moreItems = Object.keys(cart).map(k => `${k} (x${cart[k].qty})`).join(' + ');
-            await updateDoc(doc(db, "orders", activeOrderID), { item: arrayUnion(" [زاد: " + moreItems + "]") });
+            await db.collection("orders").doc(activeOrderID).update({
+                item: firebase.firestore.FieldValue.arrayUnion(" [زاد: " + moreItems + "]")
+            });
             alert("تمت الإضافة! ✅"); location.reload();
         }
 
