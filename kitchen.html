@@ -5,23 +5,38 @@
     <title>مطبخ فرغلي - لوحة الطلبات</title>
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@700;900&display=swap" rel="stylesheet">
     <style>
-        :root { --pending: #ff3e3e; --preparing: #f39c12; --done: #27ae60; --dark: #121212; }
-        body { font-family: 'Cairo', sans-serif; background: var(--dark); color: white; margin: 0; padding: 20px; overflow-x: hidden; }
+        :root { --pending: #ff3e3e; --preparing: #f39c12; --done: #27ae60; --dark: #121212; --danger: #e74c3c; }
         
-        h1 { text-align: center; color: var(--preparing); font-size: 35px; text-transform: uppercase; margin-bottom: 30px; border-bottom: 2px solid #333; padding-bottom: 10px; }
+        /* جعل البادنج العلوي يتغير برمجياً */
+        body { font-family: 'Cairo', sans-serif; background: var(--dark); color: white; margin: 0; padding: 20px; transition: padding-top 0.5s; overflow-x: hidden; }
+        
+        /* شريط حالة الاشتراك - مخفي افتراضياً */
+        #sub-bar {
+            position: fixed; top: 0; left: 0; right: 0; height: 65px;
+            display: none; /* مخفي */
+            align-items: center; justify-content: center;
+            z-index: 10000; font-weight: 900; font-size: 18px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            background: #c0392b; color: white; animation: blink 1s infinite;
+            border-bottom: 3px solid #7b241c;
+        }
 
+        @keyframes blink { 0% {opacity: 1} 50% {opacity: 0.8} 100% {opacity: 1} }
+
+        /* شاشة القفل النهائي */
+        #lock-screen {
+            position: fixed; inset: 0; background: #000; z-index: 20000;
+            display: none; flex-direction: column; align-items: center; justify-content: center;
+            text-align: center; padding: 20px;
+        }
+
+        h1 { text-align: center; color: var(--preparing); font-size: 35px; text-transform: uppercase; margin-bottom: 30px; border-bottom: 2px solid #333; padding-bottom: 10px; }
         .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px; }
         
-        /* كارت الأوردر المطور */
         .order-card {
-            background: #1e1e1e;
-            border-radius: 20px;
-            padding: 20px;
-            position: relative;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-            border: 2px solid #333;
-            animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            transition: 0.3s;
+            background: #1e1e1e; border-radius: 20px; padding: 20px; position: relative;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5); border: 2px solid #333;
+            animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275); transition: 0.3s;
         }
         @keyframes popIn { from {opacity:0; transform: scale(0.5)} to {opacity:1; transform: scale(1)} }
 
@@ -30,60 +45,124 @@
         .tag-preparing { background: var(--preparing); color: white; }
 
         .order-item { font-size: 24px; font-weight: 900; color: #fff; margin: 15px 0; display: block; border-right: 5px solid var(--preparing); padding-right: 10px; }
-        
         .car-info { background: #2a2a2a; padding: 10px; border-radius: 12px; font-size: 14px; color: #bbb; line-height: 1.6; }
         .car-info b { color: #fff; }
 
         .actions { display: flex; gap: 10px; margin-top: 20px; }
         .btn { flex: 1; padding: 15px; border: none; border-radius: 12px; font-weight: bold; cursor: pointer; font-family: 'Cairo'; font-size: 16px; transition: 0.3s; }
-        
         .btn-prep { background: var(--preparing); color: white; }
         .btn-done { background: var(--done); color: white; }
-        .btn:active { transform: scale(0.9); }
-
-        /* صوت التنبيه */
-        #newOrderSound { display: none; }
     </style>
 </head>
 <body>
 
-    <h1>👨‍🍳 مطبخ فرغلي - أوردرات اللايف</h1>
-
-    <div class="grid" id="ordersGrid">
-        <!-- الأوردرات هتظهر هنا -->
+    <!-- شريط التنبيه (يظهر فقط في فترة السماح) -->
+    <div id="sub-bar">
+        جاري حساب وقت السماح...
     </div>
 
-    <!-- صوت تنبيه عند وصول أوردر جديد -->
+    <!-- شاشة القفل النهائي -->
+    <div id="lock-screen">
+        <h1 style="color: white; font-size: 50px;">🔒</h1>
+        <h1 style="color: white;">انتهى الاشتراك</h1>
+        <p style="font-size: 20px; color: #ccc;">تم إيقاف النظام. يرجى التواصل مع الإدارة للتجديد.</p>
+        <div id="pay-contacts" style="background: #111; padding: 20px; border-radius: 15px; border: 1px solid #c0392b; color: #e74c3c; font-weight: bold;"></div>
+    </div>
+
+    <h1>👨‍🍳 مطبخ فرغلي - أوردرات اللايف</h1>
+
+    <div class="grid" id="ordersGrid"></div>
+
     <audio id="orderAudio">
         <source src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" type="audio/mpeg">
     </audio>
 
-<script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-    import { getFirestore, collection, onSnapshot, doc, updateDoc, query, orderBy } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
 
+<script>
     const firebaseConfig = {
         apiKey: "AIzaSyDArRMLPNgFZOcaCYNOtL1YWTIBVtzN638",
         projectId: "farghaly-4e65b",
+        databaseURL: "https://farghaly-4e65b-default-rtdb.firebaseio.com",
         appId: "1:549106402224:web:3a963a0478e78ce56dcc75"
     };
 
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+    const rtdb = firebase.database();
 
     let firstLoad = true;
+    let config = {};
+    let countdownTimer = null;
 
-    // 1. الاستماع للطلبات (المعلقة والتحضير فقط)
-    onSnapshot(collection(db, "orders"), (snapshot) => {
-        const grid = document.getElementById('ordersGrid');
+    rtdb.ref('config').on('value', snap => {
+        config = snap.val() || {};
+        updateSubUI();
+    });
+
+    function updateSubUI() {
+        const bar = document.getElementById('sub-bar');
+        const lockScreen = document.getElementById('lock-screen');
+        const contacts = document.getElementById('pay-contacts');
         
-        // تشغيل صوت لو فيه أوردر جديد زاد عن المرة اللي فاتت
+        const now = Date.now();
+        const expiry = config.expiryDate || 0;
+        const grace = (config.graceDays || 0) * 24 * 60 * 60 * 1000;
+        const deadLine = expiry + grace;
+
+        // 1. حالة القفل النهائي أو انتهاء السماح
+        if (config.manualLocked || now > deadLine) {
+            lockScreen.style.display = 'flex';
+            bar.style.display = 'none';
+            document.body.style.paddingTop = '20px';
+            contacts.innerHTML = `📞 للتجديد تواصل مع الإدارة: ${config.payPhone || ''}`;
+        } 
+        // 2. حالة فترة السماح (التنبيه المطلوب)
+        else if (now > expiry) {
+            bar.style.display = 'flex';
+            document.body.style.paddingTop = '80px'; // إزاحة الصفحة للأسفل لظهور الشريط
+            lockScreen.style.display = 'none';
+            startCountdown(deadLine);
+        } 
+        // 3. حالة الاشتراك النشط (إخفاء كل شيء)
+        else {
+            bar.style.display = 'none';
+            lockScreen.style.display = 'none';
+            document.body.style.paddingTop = '20px'; // إرجاع الصفحة لوضعها الطبيعي
+            if (countdownTimer) clearInterval(countdownTimer);
+        }
+    }
+
+    function startCountdown(endTime) {
+        if (countdownTimer) clearInterval(countdownTimer);
+        
+        const bar = document.getElementById('sub-bar');
+        countdownTimer = setInterval(() => {
+            const now = Date.now();
+            const diff = endTime - now;
+            
+            if (diff <= 0) {
+                clearInterval(countdownTimer);
+                updateSubUI();
+            } else {
+                const h = Math.floor(diff / 3600000);
+                const m = Math.floor((diff % 3600000) / 60000);
+                const s = Math.floor((diff % 60000) / 1000);
+                bar.innerHTML = `⚠️ تنبيه: فترة سماح! المطبخ سيغلق تماماً بعد: ${h}:${m}:${s}`;
+            }
+        }, 1000);
+    }
+
+    // --- إدارة الأوردرات (Firestore) ---
+    db.collection("orders").onSnapshot((snapshot) => {
+        const grid = document.getElementById('ordersGrid');
         if (!firstLoad && snapshot.docChanges().some(change => change.type === "added")) {
-            document.getElementById('orderAudio').play();
+            document.getElementById('orderAudio').play().catch(()=>{});
         }
         firstLoad = false;
 
-        // فلترة وعرض الطلبات (التي لم تنتهِ بعد)
         const activeOrders = [];
         snapshot.forEach(d => {
             const data = d.data();
@@ -92,7 +171,6 @@
             }
         });
 
-        // ترتيب حسب الوقت (الأقدم فوق)
         activeOrders.sort((a, b) => b.timestamp - a.timestamp);
 
         grid.innerHTML = activeOrders.map(o => `
@@ -100,15 +178,12 @@
                 <div class="order-status-tag ${o.status === 'preparing' ? 'tag-preparing' : 'tag-pending'}">
                     ${o.status === 'preparing' ? 'جاري التحضير' : 'في الانتظار'}
                 </div>
-                
                 <span class="order-item">${o.item}</span>
-                
                 <div class="car-info">
                     🚗 السيارة: <b>${o.car} (${o.color})</b><br>
                     🔢 النمرة: <b>${o.plate || 'غير مسجلة'}</b><br>
                     📞 الموبايل: <b>${o.phone}</b>
                 </div>
-
                 <div class="actions">
                     ${o.status === 'pending' ? 
                         `<button class="btn btn-prep" onclick="updateStatus('${o.id}', 'preparing')">بدء التحضير 🍎</button>` : 
@@ -119,20 +194,15 @@
         `).join('');
 
         if(activeOrders.length === 0) {
-            grid.innerHTML = "<h2 style='grid-column: 1/-1; text-align:center; color:#444'>لا توجد طلبات حالياً..</h2>";
+            grid.innerHTML = "<h2 style='grid-column: 1/-1; text-align:center; color:#444; margin-top:50px;'>لا توجد طلبات حالياً..</h2>";
         }
     });
 
-    // 2. تحديث الحالة (انتظار -> تحضير -> تم)
     window.updateStatus = async (id, newStatus) => {
         try {
-            const orderRef = doc(db, "orders", id);
-            await updateDoc(orderRef, { status: newStatus });
-        } catch (e) {
-            alert("خطأ في التحديث: " + e.message);
-        }
+            await db.collection("orders").doc(id).update({ status: newStatus });
+        } catch (e) { console.error(e); }
     };
-
 </script>
 </body>
 </html>
